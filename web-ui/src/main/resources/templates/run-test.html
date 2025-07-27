@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::title}, ~{::section})}">
+<head>
+    <title>Run Test - Gatling Web Console</title>
+</head>
+<body>
+    <section>
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2">Run Gatling Test</h1>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Upload Test JAR</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="uploadForm" action="/run-test" method="post" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <label for="testJar" class="form-label">Test JAR File</label>
+                                <input class="form-control" type="file" id="testJar" name="testJar" accept=".jar" required>
+                                <div class="form-text">Select a JAR file containing Gatling tests.</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="testClass" class="form-label">Test Class (optional)</label>
+                                <input type="text" class="form-control" id="testClass" name="testClass" placeholder="com.example.MySimulation">
+                                <div class="form-text">If not specified, all simulations in the JAR will be executed.</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Description</label>
+                                <input type="text" class="form-control" id="description" name="description" placeholder="Test description">
+                            </div>
+                            
+                            <h5 class="mt-4 mb-3">Test Parameters</h5>
+                            
+                            <div class="mb-3">
+                                <label for="users" class="form-label">Number of Users</label>
+                                <input type="number" class="form-control" id="users" name="users" value="10" min="1">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="rampUp" class="form-label">Ramp-up Period (seconds)</label>
+                                <input type="number" class="form-control" id="rampUp" name="rampUp" value="30" min="1">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="duration" class="form-label">Test Duration (seconds)</label>
+                                <input type="number" class="form-control" id="duration" name="duration" value="60" min="1">
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">Run Test</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>Instructions</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>To run a Gatling test:</p>
+                        <ol>
+                            <li>Upload a JAR file containing Gatling simulations</li>
+                            <li>Optionally specify a specific test class to run</li>
+                            <li>Configure test parameters</li>
+                            <li>Click "Run Test" to start the test</li>
+                        </ol>
+                        <p>Once the test is running, you will be redirected to the results page to view the progress.</p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Recent Tests</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>No recent tests found.</p>
+                        <a href="/results" class="btn btn-outline-primary">View All Results</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</body>
+</html>

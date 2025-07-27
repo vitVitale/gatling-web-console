@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::title}, ~{::section})}">
+<head>
+    <title>Dashboard - Gatling Web Console</title>
+</head>
+<body>
+    <section>
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2">Dashboard</h1>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Recent Tests</h5>
+                        <p class="card-text">View your recently executed Gatling tests.</p>
+                        <a href="/results" class="btn btn-primary">View Results</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Run Test</h5>
+                        <p class="card-text">Execute a new Gatling performance test.</p>
+                        <a href="/run-test" class="btn btn-success">Run New Test</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">System Status</h5>
+                        <p class="card-text">Server is operational.</p>
+                        <span class="badge bg-success">Online</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>About Gatling Web Console</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>
+                            Gatling Web Console is a web-based interface for running and analyzing Gatling performance tests.
+                            It provides a simple way to execute tests and view results without having to use the command line.
+                        </p>
+                        <p>
+                            This is a clone of Gatling Enterprise Frontline, providing similar functionality in a simplified form.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</body>
+</html>
