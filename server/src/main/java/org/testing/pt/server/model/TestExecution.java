@@ -20,7 +20,7 @@ public class TestExecution {
     private TestParameters parameters;
     
     @JsonIgnore // Don't serialize the process
-    private transient Process process;
+    private Process process;
     
     public TestExecution() {
         this.id = UUID.randomUUID().toString();

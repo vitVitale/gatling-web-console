@@ -118,7 +118,7 @@ public class GatlingService {
         executorService.submit(() -> {
             try {
                 execution.setStatus(TestStatus.RUNNING);
-                log.info("\n########  Gatling test execution started: {}  ######\n", execution.getId());
+                log.info("########  Gatling test execution started: {}  ######", execution.getId());
                 
                 // Create a directory for the test results
                 Path testResultsDir = Paths.get(resultsDirectory, execution.getId());
