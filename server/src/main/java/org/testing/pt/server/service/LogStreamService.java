@@ -90,7 +90,7 @@ public class LogStreamService {
                     final String logLine = line;
                     try {
                         emitter.send(SseEmitter.event()
-                                .name("log")
+//                                .name("log")
                                 .data(logLine));
                         
                         logger.debug("Sent log line for test {}: {}", testId, logLine);

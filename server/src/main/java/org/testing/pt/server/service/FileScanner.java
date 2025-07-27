@@ -1,6 +1,7 @@
 package org.testing.pt.server.service;
 
 import lombok.Getter;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,23 +28,14 @@ import java.util.stream.Stream;
 public class FileScanner {
 
     private static final Logger logger = LoggerFactory.getLogger(FileScanner.class);
-    
-    @Value("${simulations.folder:/opt/gatling/simulations}")
+
+    @Setter
+    @Value("${gatling.jars.dir:/opt/gatling/jars}")
     private String simulationsFolder;
 
     @Getter
     private final List<FileInfo> files = new CopyOnWriteArrayList<>();
-    
-    /**
-     * Sets the simulations folder path.
-     * This method is primarily used for testing.
-     * 
-     * @param simulationsFolder the path to the simulations folder
-     */
-    public void setSimulationsFolder(String simulationsFolder) {
-        this.simulationsFolder = simulationsFolder;
-    }
-    
+
     /**
      * Initializes the service by scanning the simulations folder.
      */
@@ -81,12 +73,12 @@ public class FileScanner {
         
         try {
             // Scan the folder for files (not subdirectories)
-            List<FileInfo> scannedFiles = new ArrayList<>();
+            List<FileInfo> scannedFiles;
             try (Stream<Path> paths = Files.list(folder)) {
                 scannedFiles = paths
                         .filter(Files::isRegularFile)
                         .map(this::createFileInfo)
-                        .collect(Collectors.toList());
+                        .toList();
             }
             
             // Update the files list

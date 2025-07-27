@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.testing.pt.server.model.TestExecution;
 import org.testing.pt.server.model.TestParameters;
-import org.testing.pt.server.service.FileScanner;
 import org.testing.pt.server.service.GatlingService;
 
 import java.io.IOException;
@@ -70,7 +69,11 @@ public class TestController {
     @GetMapping("/run")
     public ResponseEntity<TestExecution> runTest() {
 
-        TestExecution execution = gatlingService.runTest("gatling_3.jar", "MySimulation", "description", new TestParameters());
+        TestExecution execution = gatlingService.runTest(
+                "gatling_3.jar",
+//                "org.tests.computerdatabase.ComputerDatabaseSimulation",
+                "org.tests.demostoresimulation.DemostoreSimulation",
+                "description", new TestParameters());
         return ResponseEntity.ok(execution);
 
     }
@@ -109,7 +112,7 @@ public class TestController {
      * @return a response indicating success or failure
      */
     @PostMapping("/{id}/stop")
-    public ResponseEntity<Void> stopTest(@PathVariable String id) {
+    public ResponseEntity<Void> stopTest(@PathVariable("id") String id) {
         boolean stopped = gatlingService.stopTest(id);
         if (stopped) {
             return ResponseEntity.ok().build();

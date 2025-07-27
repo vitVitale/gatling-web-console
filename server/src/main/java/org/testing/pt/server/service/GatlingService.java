@@ -1,5 +1,6 @@
 package org.testing.pt.server.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,9 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -33,15 +32,17 @@ import java.util.concurrent.Executors;
  * Service for running Gatling tests.
  */
 @Service
+@Slf4j
 public class GatlingService {
-    
-    private static final Logger logger = LoggerFactory.getLogger(GatlingService.class);
-    
+
     @Value("${gatling.tests.dir:./gatling-tests}")
     private String testsDirectory;
     
     @Value("${gatling.results.dir:./gatling-results}")
     private String resultsDirectory;
+
+    @Value("${gatling.jars.dir:/opt/gatling/jars}")
+    private String gatlingJarsDirectory;
     
     @Autowired
     private FileScanner fileScanner;
@@ -61,9 +62,9 @@ public class GatlingService {
         try {
             Files.createDirectories(Paths.get(testsDirectory));
             Files.createDirectories(Paths.get(resultsDirectory));
-            logger.info("Gatling directories initialized: tests={}, results={}", testsDirectory, resultsDirectory);
+            log.info("Gatling directories initialized: tests={}, results={}", testsDirectory, resultsDirectory);
         } catch (IOException e) {
-            logger.error("Failed to create Gatling directories", e);
+            log.error("Failed to create Gatling directories", e);
         }
     }
     
@@ -77,7 +78,7 @@ public class GatlingService {
     public String uploadTestJar(MultipartFile file) throws IOException {
         Path testJarPath = Paths.get(testsDirectory, file.getOriginalFilename());
         Files.copy(file.getInputStream(), testJarPath);
-        logger.info("Test JAR uploaded: {}", testJarPath);
+        log.info("Test JAR uploaded: {}", testJarPath);
         return testJarPath.toString();
     }
     
@@ -117,30 +118,25 @@ public class GatlingService {
         executorService.submit(() -> {
             try {
                 execution.setStatus(TestStatus.RUNNING);
-                logger.info("Running test: {}", execution.getId());
+                log.info("\n########  Gatling test execution started: {}  ######\n", execution.getId());
                 
                 // Create a directory for the test results
                 Path testResultsDir = Paths.get(resultsDirectory, execution.getId());
                 Files.createDirectories(testResultsDir);
-                
+
+                // Add test parameters
+                String[] args = parameters.toGatlingArgs().split(" ");
+
                 // Build the command to run the Gatling test
                 List<String> command = new ArrayList<>();
                 command.add("java");
-                command.add("-cp");
-                command.add(testJarPath);
+                command.addAll(Arrays.asList(args));
                 command.add("-Dgatling.core.outputDirectoryBaseName=" + execution.getId());
-                
-                // Add test parameters
-                String[] args = parameters.toGatlingArgs().split(" ");
-                for (String arg : args) {
-                    command.add(arg);
-                }
-                
-                // Add the test class if specified
-                if (testClass != null && !testClass.isEmpty()) {
-                    command.add(testClass);
-                }
-                
+                // Add the Simulation class if specified
+                if (Objects.nonNull(testClass) && !testClass.isEmpty()) command.add("-Dsimulation=" + testClass);
+                command.add("-jar");
+                command.add(Paths.get(gatlingJarsDirectory, testJarPath).toString());
+
                 // Run the command
                 ProcessBuilder processBuilder = new ProcessBuilder(command);
                 processBuilder.directory(new File(resultsDirectory));
@@ -148,43 +144,43 @@ public class GatlingService {
                 
                 Process process = processBuilder.start();
                 execution.setProcess(process);
-                
+
                 // Send a log message indicating the test has started
 //                logStreamService.sendLogMessage(execution.getId(), "Test started: " + execution.getDescription());
                 
                 // Create a thread to read the process output and send it to the log stream
-                Thread outputThread = new Thread(() -> {
-                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-//                            logStreamService.sendLogMessage(execution.getId(), line);
-                            System.out.println("OUTPUT");
-                        }
-                    } catch (IOException e) {
-                        logger.error("Error reading process output", e);
-                    }
-                });
-                outputThread.start();
-                
-                // Create a thread to read the process error output and send it to the log stream
-                Thread errorThread = new Thread(() -> {
-                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-//                            logStreamService.sendLogMessage(execution.getId(), "ERROR: " + line);
-                            System.out.println("ERROR: ");
-                        }
-                    } catch (IOException e) {
-                        logger.error("Error reading process error output", e);
-                    }
-                });
-                errorThread.start();
+//                Thread outputThread = new Thread(() -> {
+//                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+//                        String line;
+//                        while ((line = reader.readLine()) != null) {
+////                            logStreamService.sendLogMessage(execution.getId(), line);
+//                            System.out.println(line);
+//                        }
+//                    } catch (IOException e) {
+//                        log.error("Error reading process output", e);
+//                    }
+//                });
+//                outputThread.start();
+//
+//                // Create a thread to read the process error output and send it to the log stream
+//                Thread errorThread = new Thread(() -> {
+//                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+//                        String line;
+//                        while ((line = reader.readLine()) != null) {
+////                            logStreamService.sendLogMessage(execution.getId(), "ERROR: " + line);
+//                            System.out.println("ERROR: " + line);
+//                        }
+//                    } catch (IOException e) {
+//                        log.error("Error reading process error output", e);
+//                    }
+//                });
+//                errorThread.start();
                 
                 int exitCode = process.waitFor();
                 
                 // Wait for the output threads to finish
-                outputThread.join();
-                errorThread.join();
+//                outputThread.join();
+//                errorThread.join();
                 
                 // Update the test execution status
                 if (exitCode == 0) {
@@ -200,10 +196,10 @@ public class GatlingService {
                 execution.setEndTime(LocalDateTime.now());
                 execution.setResultPath(testResultsDir.toString());
                 execution.setProcess(null); // Clear the process reference
-                
-                logger.info("Test completed: {}, status: {}", execution.getId(), execution.getStatus());
+
+                log.info("Test completed: {}, status: {}", execution.getId(), execution.getStatus());
             } catch (Exception e) {
-                logger.error("Error running test: {}", execution.getId(), e);
+                log.error("Error running test: {}", execution.getId(), e);
                 execution.setStatus(TestStatus.FAILED);
                 execution.setEndTime(LocalDateTime.now());
             }
@@ -242,7 +238,7 @@ public class GatlingService {
         if (execution != null && execution.getStatus() == TestStatus.RUNNING) {
             Process process = execution.getProcess();
             if (process != null && process.isAlive()) {
-                logger.info("Stopping test: {}", id);
+                log.info("Stopping test: {}", id);
                 process.destroy();
                 
                 // Wait for the process to terminate
@@ -254,7 +250,7 @@ public class GatlingService {
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    logger.error("Interrupted while waiting for process to terminate", e);
+                    log.error("Interrupted while waiting for process to terminate", e);
                 }
                 
                 execution.setStatus(TestStatus.STOPPED);
@@ -264,8 +260,8 @@ public class GatlingService {
                 // Send a log message indicating the test was stopped
 //                logStreamService.sendLogMessage(id, "Test was manually stopped by user");
                 System.out.println("Test was manually stopped by user");
-                
-                logger.info("Test stopped: {}", id);
+
+                log.info("Test stopped: {}", id);
                 return true;
             }
         }
@@ -286,10 +282,10 @@ public class GatlingService {
         if (execution != null) {
             try {
                 FileUtils.deleteDirectory(new File(execution.getResultPath()));
-                logger.info("Test execution deleted: {}", id);
+                log.info("Test execution deleted: {}", id);
                 return true;
             } catch (IOException e) {
-                logger.error("Error deleting test results: {}", id, e);
+                log.error("Error deleting test results: {}", id, e);
             }
         }
         return false;
