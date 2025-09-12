@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::title}, ~{::section})}">
+<head>
+    <title>Test Result Details - Gatling Web Console</title>
+</head>
+<body>
+    <section>
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2">Test Result Details</h1>
+            <div class="btn-toolbar mb-2 mb-md-0">
+                <a href="/results" class="btn btn-sm btn-outline-secondary me-2">
+                    Back to Results
+                </a>
+                <a th:href="@{'/results/' + ${test.id} + '/download'}" class="btn btn-sm btn-outline-primary" th:if="${test.status != null && test.status.name() == 'COMPLETED'}">
+                    Download Report
+                </a>
+            </div>
+        </div>
+        
+        <div class="alert alert-danger" th:if="${test == null}">
+            Test result not found.
+        </div>
+        
+        <!-- Success and error messages -->
+        <div class="alert alert-success alert-dismissible fade show" role="alert" th:if="${successMessage != null}">
+            <span th:text="${successMessage}">Success message</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        
+        <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${errorMessage != null}">
+            <span th:text="${errorMessage}">Error message</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        
+        <div th:if="${test != null}">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Test Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table">
+                                <tbody>
+                                    <tr>
+                                        <th>ID</th>
+                                        <td th:text="${test.id}">1</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Description</th>
+                                        <td th:text="${test.description}">Sample Test</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Test Class</th>
+                                        <td th:text="${test.testClass ?: 'Not specified'}">com.example.MySimulation</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Start Time</th>
+                                        <td th:text="${#temporals.format(test.startTime, 'yyyy-MM-dd HH:mm:ss')}">2025-07-26 19:00:00</td>
+                                    </tr>
+                                    <tr>
+                                        <th>End Time</th>
+                                        <td th:text="${test.endTime != null ? #temporals.format(test.endTime, 'yyyy-MM-dd HH:mm:ss') : 'Running'}">2025-07-26 19:01:00</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Duration</th>
+                                        <td th:text="${test.duration}">60s</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Status</th>
+                                        <td>
+                                            <span th:if="${test.status != null && test.status.name() == 'COMPLETED'}" class="badge bg-success">Completed</span>
+                                            <span th:if="${test.status != null && test.status.name() == 'RUNNING'}" class="badge bg-primary">Running</span>
+                                            <span th:if="${test.status != null && test.status.name() == 'FAILED'}" class="badge bg-danger">Failed</span>
+                                            <span th:if="${test.status != null && test.status.name() == 'PENDING'}" class="badge bg-warning">Pending</span>
+                                            <span th:if="${test.status != null && test.status.name() == 'STOPPED'}" class="badge bg-secondary">Stopped</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Test Parameters</h5>
+                            <table class="table" th:if="${test.parameters != null}">
+                                <tbody>
+                                    <tr>
+                                        <th>Number of Users</th>
+                                        <td th:text="${test.parameters.users}">10</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Ramp-up Period</th>
+                                        <td th:text="${test.parameters.rampUp + ' seconds'}">30 seconds</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Test Duration</th>
+                                        <td th:text="${test.parameters.duration + ' seconds'}">60 seconds</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4" th:if="${test.status != null && test.status.name() == 'COMPLETED'}">
+                <div class="card-header">
+                    <h5>Test Results</h5>
+                </div>
+                <div class="card-body">
+                    <p>Detailed test results are available in the Gatling report.</p>
+                    <a th:href="@{'/results/' + ${test.id} + '/download'}" class="btn btn-primary">
+                        Download Report
+                    </a>
+                </div>
+            </div>
+            
+            <div class="card mb-4" th:if="${test.status != null && (test.status.name() == 'RUNNING' || test.status.name() == 'PENDING')}">
+                <div class="card-header">
+                    <h5>Test Progress</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-3">
+                        <div>
+                            <p>The test is currently running. You can view the logs below or stop the test.</p>
+                        </div>
+                        <div>
+                            <form th:action="@{'/results/' + ${test.id} + '/stop'}" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-danger">Stop Test</button>
+                            </form>
+                            <button class="btn btn-primary ms-2" onclick="location.reload()">Refresh</button>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6>Live Logs</h6>
+                            <div>
+                                <span id="connection-status" class="badge bg-secondary">Connecting...</span>
+                                <button id="clear-logs" class="btn btn-sm btn-outline-secondary ms-2">Clear</button>
+                                <button id="save-logs" class="btn btn-sm btn-outline-primary ms-2">Save</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <input type="text" id="log-filter" class="form-control" placeholder="Filter logs (press Enter to apply)">
+                            </div>
+                            <div id="log-container" style="height: 400px; overflow-y: auto; background-color: #f8f9fa; padding: 10px; font-family: monospace; white-space: pre-wrap;">
+                                <div id="log-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <script th:inline="javascript">
+                        var testId = /*[[${test.id}]]*/ 'test-id';
+                        
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var logContainer = document.getElementById('log-container');
+                            var logContent = document.getElementById('log-content');
+                            var connectionStatus = document.getElementById('connection-status');
+                            var clearLogsBtn = document.getElementById('clear-logs');
+                            var saveLogsBtn = document.getElementById('save-logs');
+                            var logFilter = document.getElementById('log-filter');
+                            
+                            var allLogs = []; // Store all logs for filtering
+                            var filterText = ''; // Current filter text
+                            
+                            // Create EventSource for SSE
+                            var eventSource = new EventSource('/logs/' + testId);
+                            
+                            // Update connection status when the connection opens
+                            eventSource.onopen = function() {
+                                connectionStatus.textContent = 'Connected';
+                                connectionStatus.className = 'badge bg-success';
+                            };
+                            
+                            // Handle log events
+                            eventSource.addEventListener('log', function(event) {
+                                // Store the log message
+                                allLogs.push(event.data);
+                                
+                                // Only display if it passes the filter
+                                if (filterText === '' || event.data.toLowerCase().includes(filterText.toLowerCase())) {
+                                    var logLine = document.createElement('div');
+                                    logLine.textContent = event.data;
+                                    
+                                    // Highlight error messages
+                                    if (event.data.toLowerCase().includes('error') || 
+                                        event.data.toLowerCase().includes('exception') ||
+                                        event.data.toLowerCase().includes('fail')) {
+                                        logLine.className = 'text-danger';
+                                    }
+                                    
+                                    logContent.appendChild(logLine);
+                                    
+                                    // Auto-scroll to bottom
+                                    logContainer.scrollTop = logContainer.scrollHeight;
+                                }
+                            });
+                            
+                            // Handle errors
+                            eventSource.onerror = function() {
+                                console.error('Error in log stream');
+                                connectionStatus.textContent = 'Disconnected';
+                                connectionStatus.className = 'badge bg-danger';
+                                eventSource.close();
+                            };
+                            
+                            // Close the event source when the page is unloaded
+                            window.addEventListener('beforeunload', function() {
+                                eventSource.close();
+                            });
+                            
+                            // Clear logs button
+                            clearLogsBtn.addEventListener('click', function() {
+                                logContent.innerHTML = '';
+                                allLogs = [];
+                            });
+                            
+                            // Save logs button
+                            saveLogsBtn.addEventListener('click', function() {
+                                // Create a blob with the logs
+                                var blob = new Blob([allLogs.join('\n')], {type: 'text/plain'});
+                                var url = URL.createObjectURL(blob);
+                                
+                                // Create a link and click it to download
+                                var a = document.createElement('a');
+                                a.href = url;
+                                a.download = 'test-' + testId + '-logs.txt';
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(url);
+                            });
+                            
+                            // Filter logs
+                            logFilter.addEventListener('keyup', function(event) {
+                                if (event.key === 'Enter') {
+                                    filterText = logFilter.value;
+                                    applyFilter();
+                                }
+                            });
+                            
+                            function applyFilter() {
+                                // Clear current display
+                                logContent.innerHTML = '';
+                                
+                                // Apply filter and redisplay matching logs
+                                allLogs.forEach(function(log) {
+                                    if (filterText === '' || log.toLowerCase().includes(filterText.toLowerCase())) {
+                                        var logLine = document.createElement('div');
+                                        logLine.textContent = log;
+                                        
+                                        // Highlight error messages
+                                        if (log.toLowerCase().includes('error') || 
+                                            log.toLowerCase().includes('exception') ||
+                                            log.toLowerCase().includes('fail')) {
+                                            logLine.className = 'text-danger';
+                                        }
+                                        
+                                        logContent.appendChild(logLine);
+                                    }
+                                });
+                                
+                                // Auto-scroll to bottom
+                                logContainer.scrollTop = logContainer.scrollHeight;
+                            }
+                        });
+                    </script>
+                </div>
+            </div>
+            
+            <div class="card mb-4" th:if="${test.status != null && test.status.name() == 'FAILED'}">
+                <div class="card-header">
+                    <h5>Test Failure</h5>
+                </div>
+                <div class="card-body">
+                    <p>The test failed to complete. Check the server logs for more information.</p>
+                </div>
+            </div>
+            
+            <div class="card mb-4" th:if="${test.status != null && test.status.name() == 'STOPPED'}">
+                <div class="card-header">
+                    <h5>Test Stopped</h5>
+                </div>
+                <div class="card-body">
+                    <p>The test was manually stopped by the user.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+</body>
+</html>
