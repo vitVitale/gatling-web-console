@@ -12,6 +12,7 @@ import org.testing.pt.gatling.model.FileInfo;
 import org.testing.pt.gatling.model.TestExecution;
 import org.testing.pt.gatling.model.TestParameters;
 import org.testing.pt.gatling.model.TestStatus;
+import org.testing.pt.gatling.repository.TestExecutionRepository;
 
 import jakarta.annotation.PostConstruct;
 
@@ -49,8 +50,12 @@ public class GatlingService {
 
     @Autowired
     private LogStreamService logStreamService;
-    
-    private final Map<String, TestExecution> testExecutions = new ConcurrentHashMap<>();
+
+    @Autowired
+    private TestExecutionRepository testExecutionRepository;
+
+    // Keep running processes in memory (not persisted)
+    private final Map<String, Process> runningProcesses = new ConcurrentHashMap<>();
     private final ExecutorService executorService = Executors.newFixedThreadPool(5);
     
     /**
@@ -70,7 +75,7 @@ public class GatlingService {
     
     /**
      * Uploads a test JAR file.
-     * 
+     *
      * @param file the JAR file to upload
      * @return the path to the uploaded file
      * @throws IOException if an I/O error occurs
@@ -81,69 +86,94 @@ public class GatlingService {
         log.info("Test JAR uploaded: {}", testJarPath);
         return testJarPath.toString();
     }
+
+    /**
+     * Gets available JAR files from the simulations directory.
+     *
+     * @return list of available JAR files
+     */
+    public List<FileInfo> getAvailableJarFiles() {
+        return fileScanner.getAllFiles().stream()
+                .filter(file -> file.getName().endsWith(".jar"))
+                .toList();
+    }
     
     /**
      * Runs a Gatling test.
-     * 
-     * @param testJarPath the path to the test JAR file
-     * @param testClass the test class to run (optional)
+     *
+     * @param jarFileName the name of the JAR file
+     * @param simulationClass the simulation class to run
+     * @param engineClass the engine class to use
      * @param description the test description
      * @param parameters the test parameters
      * @return the test execution
      * @throws IllegalArgumentException if the test JAR file is not in the designated folder
      */
-    public TestExecution runTest(String testJarPath, String testClass, String description, TestParameters parameters) {
+    public TestExecution runTest(String jarFileName, String simulationClass, String engineClass,
+                                  String description, TestParameters parameters) {
         // Validate that the JAR file is in the designated folder
         var isPresent = fileScanner.getAllFiles().stream()
                 .map(FileInfo::getName)
-                .anyMatch(name -> name.equals(testJarPath));
+                .anyMatch(name -> name.equals(jarFileName));
 
         if (!isPresent) {
-            throw new IllegalArgumentException("Test JAR could not be found: " + testJarPath);
+            throw new IllegalArgumentException("Test JAR could not be found: " + jarFileName);
         }
-        
-        TestExecution execution = new TestExecution(description, testClass, parameters);
-        testExecutions.put(execution.getId(), execution);
-        
-        executorService.submit(() -> {
-            try {
-                execution.setStatus(TestStatus.RUNNING);
-                log.info("########  Gatling test execution started: {}  ######", execution.getId());
-                
-                // Create a directory for the test results
-                Path testResultsDir = Paths.get(resultsDirectory, execution.getId());
-                Files.createDirectories(testResultsDir);
 
-                // Add test parameters
-                String[] args = parameters.toGatlingArgs().split(" ");
+        TestExecution execution = new TestExecution(description, simulationClass, parameters);
+        execution = testExecutionRepository.save(execution);
+
+        final String executionId = execution.getId();
+
+        executorService.submit(() -> {
+            TestExecution exec = testExecutionRepository.findById(executionId).orElseThrow();
+            try {
+                exec.setStatus(TestStatus.RUNNING);
+                testExecutionRepository.save(exec);
+                log.info("########  Gatling test execution started: {}  ######", exec.getId());
+
+                // Create a directory for the test results
+                Path testResultsDir = Paths.get(resultsDirectory, exec.getId());
+                Files.createDirectories(testResultsDir);
 
                 // Build the command to run the Gatling test
                 List<String> command = new ArrayList<>();
                 command.add("java");
-                command.addAll(Arrays.asList(args));
-                command.add("-Dgatling.core.outputDirectoryBaseName=" + execution.getId());
-                // Add the Simulation class if specified
-                if (Objects.nonNull(testClass) && !testClass.isEmpty()) command.add("-Dsimulation=" + testClass);
+
+                // Add custom parameters
+                if (parameters != null) {
+                    command.addAll(Arrays.asList(parameters.toJavaArgs()));
+                }
+
+                // Add Gatling output directory
+                command.add("-Dgatling.core.outputDirectoryBaseName=" + exec.getId());
+
+                // Add the Simulation class
+                if (Objects.nonNull(simulationClass) && !simulationClass.isEmpty()) {
+                    command.add("-Dsimulation=" + simulationClass);
+                }
+
+                // Add JAR file
                 command.add("-jar");
-                command.add(Paths.get(gatlingJarsDirectory, testJarPath).toString());
+                command.add(Paths.get(gatlingJarsDirectory, jarFileName).toString());
 
                 // Run the command
                 ProcessBuilder processBuilder = new ProcessBuilder(command);
                 processBuilder.directory(new File(resultsDirectory));
                 processBuilder.redirectErrorStream(true);
-                
+
                 Process process = processBuilder.start();
-                execution.setProcess(process);
+                runningProcesses.put(exec.getId(), process);
 
                 // Send a log message indicating the test has started
-                logStreamService.sendLogMessage(execution.getId(), "Test started: " + execution.getDescription());
+                logStreamService.sendLogMessage(exec.getId(), "Test started: " + exec.getDescription());
                 
                 // Create a thread to read the process output and send it to the log stream
                 Thread outputThread = new Thread(() -> {
                     try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                         String line;
                         while ((line = reader.readLine()) != null) {
-                            logStreamService.sendLogMessage(execution.getId(), line);
+                            logStreamService.sendLogMessage(exec.getId(), line);
                         }
                     } catch (IOException e) {
                         log.error("Error reading process output", e);
@@ -156,38 +186,41 @@ public class GatlingService {
                     try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
                         String line;
                         while ((line = reader.readLine()) != null) {
-                            logStreamService.sendLogMessage(execution.getId(), "ERROR: " + line);
+                            logStreamService.sendLogMessage(exec.getId(), "ERROR: " + line);
                         }
                     } catch (IOException e) {
                         log.error("Error reading process error output", e);
                     }
                 });
                 errorThread.start();
-                
+
                 int exitCode = process.waitFor();
-                
+
                 // Wait for the output threads to finish
                 outputThread.join();
                 errorThread.join();
-                
+
                 // Update the test execution status
                 if (exitCode == 0) {
-                    execution.setStatus(TestStatus.COMPLETED);
-                    logStreamService.sendLogMessage(execution.getId(), "Test completed successfully");
+                    exec.setStatus(TestStatus.COMPLETED);
+                    logStreamService.sendLogMessage(exec.getId(), "Test completed successfully");
                 } else {
-                    execution.setStatus(TestStatus.FAILED);
-                    logStreamService.sendLogMessage(execution.getId(), "Test failed with exit code: " + exitCode);
+                    exec.setStatus(TestStatus.FAILED);
+                    logStreamService.sendLogMessage(exec.getId(), "Test failed with exit code: " + exitCode);
                 }
-                
-                execution.setEndTime(LocalDateTime.now());
-                execution.setResultPath(testResultsDir.toString());
-                execution.setProcess(null); // Clear the process reference
 
-                log.info("Test completed: {}, status: {}", execution.getId(), execution.getStatus());
+                exec.setEndTime(LocalDateTime.now());
+                exec.setResultPath(testResultsDir.toString());
+                runningProcesses.remove(exec.getId());
+                testExecutionRepository.save(exec);
+
+                log.info("Test completed: {}, status: {}", exec.getId(), exec.getStatus());
             } catch (Exception e) {
-                log.error("Error running test: {}", execution.getId(), e);
-                execution.setStatus(TestStatus.FAILED);
-                execution.setEndTime(LocalDateTime.now());
+                log.error("Error running test: {}", exec.getId(), e);
+                exec.setStatus(TestStatus.FAILED);
+                exec.setEndTime(LocalDateTime.now());
+                runningProcesses.remove(exec.getId());
+                testExecutionRepository.save(exec);
             }
         });
         
@@ -196,37 +229,48 @@ public class GatlingService {
     
     /**
      * Gets a test execution by ID.
-     * 
+     *
      * @param id the test execution ID
      * @return the test execution, or null if not found
      */
     public TestExecution getTestExecution(String id) {
-        return testExecutions.get(id);
+        TestExecution execution = testExecutionRepository.findById(id).orElse(null);
+        if (execution != null && runningProcesses.containsKey(id)) {
+            execution.setProcess(runningProcesses.get(id));
+        }
+        return execution;
     }
-    
+
     /**
      * Gets all test executions.
-     * 
-     * @return a list of all test executions
+     *
+     * @return a list of all test executions ordered by start time descending
      */
     public List<TestExecution> getAllTestExecutions() {
-        return new ArrayList<>(testExecutions.values());
+        List<TestExecution> executions = testExecutionRepository.findAllByOrderByStartTimeDesc();
+        // Restore process references for running tests
+        for (TestExecution execution : executions) {
+            if (runningProcesses.containsKey(execution.getId())) {
+                execution.setProcess(runningProcesses.get(execution.getId()));
+            }
+        }
+        return executions;
     }
     
     /**
      * Stops a running test.
-     * 
+     *
      * @param id the test execution ID
      * @return true if the test was stopped, false otherwise
      */
     public boolean stopTest(String id) {
-        TestExecution execution = testExecutions.get(id);
+        TestExecution execution = testExecutionRepository.findById(id).orElse(null);
         if (execution != null && execution.getStatus() == TestStatus.RUNNING) {
-            Process process = execution.getProcess();
+            Process process = runningProcesses.get(id);
             if (process != null && process.isAlive()) {
                 log.info("Stopping test: {}", id);
                 process.destroy();
-                
+
                 // Wait for the process to terminate
                 try {
                     boolean terminated = process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
@@ -238,11 +282,12 @@ public class GatlingService {
                     Thread.currentThread().interrupt();
                     log.error("Interrupted while waiting for process to terminate", e);
                 }
-                
+
                 execution.setStatus(TestStatus.STOPPED);
                 execution.setEndTime(LocalDateTime.now());
-                execution.setProcess(null);
-                
+                runningProcesses.remove(id);
+                testExecutionRepository.save(execution);
+
                 // Send a log message indicating the test was stopped
                 logStreamService.sendLogMessage(id, "Test was manually stopped by user");
 
@@ -255,18 +300,21 @@ public class GatlingService {
     
     /**
      * Deletes a test execution and its results.
-     * 
+     *
      * @param id the test execution ID
      * @return true if the test execution was deleted, false otherwise
      */
     public boolean deleteTestExecution(String id) {
         // Stop the test if it's running
         stopTest(id);
-        
-        TestExecution execution = testExecutions.remove(id);
+
+        TestExecution execution = testExecutionRepository.findById(id).orElse(null);
         if (execution != null) {
             try {
-                FileUtils.deleteDirectory(new File(execution.getResultPath()));
+                if (execution.getResultPath() != null) {
+                    FileUtils.deleteDirectory(new File(execution.getResultPath()));
+                }
+                testExecutionRepository.deleteById(id);
                 log.info("Test execution deleted: {}", id);
                 return true;
             } catch (IOException e) {

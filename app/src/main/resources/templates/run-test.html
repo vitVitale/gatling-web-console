@@ -1,90 +1,177 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::title}, ~{::section})}">
+
 <head>
     <title>Run Test - Gatling Web Console</title>
 </head>
+
 <body>
-    <section>
-        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-            <h1 class="h2">Run Gatling Test</h1>
-        </div>
-        
-        <div class="row">
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Upload Test JAR</h5>
-                    </div>
-                    <div class="card-body">
-                        <form id="uploadForm" action="/run-test" method="post" enctype="multipart/form-data">
-                            <div class="mb-3">
-                                <label for="testJar" class="form-label">Test JAR File</label>
-                                <input class="form-control" type="file" id="testJar" name="testJar" accept=".jar" required>
-                                <div class="form-text">Select a JAR file containing Gatling tests.</div>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label for="testClass" class="form-label">Test Class (optional)</label>
-                                <input type="text" class="form-control" id="testClass" name="testClass" placeholder="com.example.MySimulation">
-                                <div class="form-text">If not specified, all simulations in the JAR will be executed.</div>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label for="description" class="form-label">Description</label>
-                                <input type="text" class="form-control" id="description" name="description" placeholder="Test description">
-                            </div>
-                            
-                            <h5 class="mt-4 mb-3">Test Parameters</h5>
-                            
-                            <div class="mb-3">
-                                <label for="users" class="form-label">Number of Users</label>
-                                <input type="number" class="form-control" id="users" name="users" value="10" min="1">
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label for="rampUp" class="form-label">Ramp-up Period (seconds)</label>
-                                <input type="number" class="form-control" id="rampUp" name="rampUp" value="30" min="1">
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label for="duration" class="form-label">Test Duration (seconds)</label>
-                                <input type="number" class="form-control" id="duration" name="duration" value="60" min="1">
-                            </div>
-                            
-                            <button type="submit" class="btn btn-primary">Run Test</button>
-                        </form>
-                    </div>
+<section>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Run Gatling Test</h1>
+    </div>
+
+    <!-- Alert Messages -->
+    <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <span th:text="${successMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <span th:text="${errorMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Configure Test Execution</h5>
+                </div>
+                <div class="card-body">
+                    <form id="runTestForm" action="/run-test" method="post">
+                        <!-- JAR File Selection -->
+                        <div class="mb-3">
+                            <label for="jarFile" class="form-label">JAR File <span class="text-danger">*</span></label>
+                            <select class="form-select" id="jarFile" name="jarFile" required>
+                                <option value="">-- Select a JAR file --</option>
+                                <option th:each="file : ${jarFiles}" th:value="${file.name}"
+                                        th:text="${file.name}"></option>
+                            </select>
+                            <div class="form-text">Select a JAR file from the simulations directory.</div>
+                        </div>
+
+                        <!-- Simulation Class -->
+                        <div class="mb-3">
+                            <label for="simulationClass" class="form-label">Simulation Class <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="simulationClass" name="simulationClass"
+                                   placeholder="com.example.MySimulation" required>
+                            <div class="form-text">Fully qualified name of the Gatling simulation class.</div>
+                        </div>
+
+                        <!-- Engine Class -->
+                        <div class="mb-3">
+                            <label for="engineClass" class="form-label">Engine Class <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="engineClass" name="engineClass"
+                                   placeholder="io.gatling.app.Gatling" value="io.gatling.app.Gatling" required>
+                            <div class="form-text">Main class to execute (usually io.gatling.app.Gatling).</div>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="2"
+                                      placeholder="Optional description for this test run"></textarea>
+                        </div>
+
+                        <!-- Dynamic Simulation Parameters -->
+                        <h5 class="mt-4 mb-3">Simulation Parameters</h5>
+                        <div class="form-text mb-3">Add custom parameters to pass to your simulation (optional).</div>
+
+                        <div id="parametersContainer">
+                            <!-- Parameters will be added dynamically here -->
+                        </div>
+
+                        <button type="button" class="btn btn-sm btn-outline-secondary mb-4" id="addParameterBtn">
+                            + Add Parameter
+                        </button>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+                            <button type="submit" class="btn btn-primary">
+                                <span>▶ Run Test</span>
+                            </button>
+                            <button type="reset" class="btn btn-outline-secondary">Reset</button>
+                        </div>
+                    </form>
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function () {
+                            let parameterCount = 0;
+                            const parametersContainer = document.getElementById('parametersContainer');
+                            const addParameterBtn = document.getElementById('addParameterBtn');
+
+                            // Add parameter row
+                            addParameterBtn.addEventListener('click', function () {
+                                parameterCount++;
+                                const parameterRow = document.createElement('div');
+                                parameterRow.className = 'row mb-2 parameter-row';
+                                parameterRow.id = `parameter-${parameterCount}`;
+
+                                parameterRow.innerHTML = `
+                                    <div class="col-md-5">
+                                        <input type="text" class="form-control" name="paramKeys" placeholder="Parameter key" required>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <input type="text" class="form-control" name="paramValues" placeholder="Parameter value" required>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-sm btn-outline-danger remove-parameter" data-id="${parameterCount}">
+                                            Remove
+                                        </button>
+                                    </div>
+                                `;
+
+                                parametersContainer.appendChild(parameterRow);
+                            });
+
+                            // Remove parameter row (using event delegation)
+                            parametersContainer.addEventListener('click', function (e) {
+                                if (e.target.classList.contains('remove-parameter')) {
+                                    const parameterId = e.target.getAttribute('data-id');
+                                    const parameterRow = document.getElementById(`parameter-${parameterId}`);
+                                    if (parameterRow) {
+                                        parameterRow.remove();
+                                    }
+                                }
+                            });
+                        });
+                    </script>
                 </div>
             </div>
-            
-            <div class="col-md-4">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5>Instructions</h5>
-                    </div>
-                    <div class="card-body">
-                        <p>To run a Gatling test:</p>
-                        <ol>
-                            <li>Upload a JAR file containing Gatling simulations</li>
-                            <li>Optionally specify a specific test class to run</li>
-                            <li>Configure test parameters</li>
-                            <li>Click "Run Test" to start the test</li>
-                        </ol>
-                        <p>Once the test is running, you will be redirected to the results page to view the progress.</p>
-                    </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Instructions</h5>
                 </div>
-                
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Recent Tests</h5>
+                <div class="card-body">
+                    <p>To run a Gatling test:</p>
+                    <ol>
+                        <li>Select a JAR file from the simulations directory</li>
+                        <li>Specify the simulation class name</li>
+                        <li>Specify the engine class (default provided)</li>
+                        <li>Optionally add a description</li>
+                        <li>Optionally add simulation parameters</li>
+                        <li>Click "Run Test" to start execution</li>
+                    </ol>
+                    <p class="mt-3"><strong>Available JAR files:</strong> <span
+                            th:text="${#lists.size(jarFiles)}">0</span></p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5>Recent Tests</h5>
+                </div>
+                <div class="card-body">
+                    <div th:if="${recentTests != null and not #lists.isEmpty(recentTests)}">
+                        <ul class="list-unstyled">
+                            <li th:each="test : ${#lists.size(recentTests) > 5 ? recentTests.subList(0, 5) : recentTests}"
+                                class="mb-2">
+                                <small>
+                                    <span th:text="${test.description ?: 'Test ' + test.id}"></span><br>
+                                    <span class="text-muted"
+                                          th:text="${#temporals.format(test.startTime, 'yyyy-MM-dd HH:mm')}"></span>
+                                </small>
+                            </li>
+                        </ul>
                     </div>
-                    <div class="card-body">
-                        <p>No recent tests found.</p>
-                        <a href="/results" class="btn btn-outline-primary">View All Results</a>
-                    </div>
+                    <p th:if="${recentTests == null or #lists.isEmpty(recentTests)}">No recent tests found.</p>
+                    <a href="/results" class="btn btn-outline-primary btn-sm mt-2">View All Results</a>
                 </div>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 </body>
 </html>

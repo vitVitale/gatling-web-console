@@ -40,9 +40,10 @@ public class LogStreamController {
         
         TestExecution execution = gatlingService.getTestExecution(id);
         if (execution == null) {
-            logger.error("Test execution not found: {}", id);
+            logger.warn("Test execution not found: {}", id);
+            // Return an SSE emitter that completes immediately without error to keep HTTP 200
             SseEmitter emitter = new SseEmitter(0L);
-            emitter.completeWithError(new IllegalArgumentException("Test execution not found: " + id));
+            emitter.complete();
             return emitter;
         }
         

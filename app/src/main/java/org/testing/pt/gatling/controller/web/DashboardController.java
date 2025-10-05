@@ -39,7 +39,8 @@ public class DashboardController {
         // Get recent tests for the dashboard
         List<TestExecution> recentTests = gatlingService.getAllTestExecutions();
         model.addAttribute("recentTests", recentTests);
-        
+        model.addAttribute("requestURI", "/dashboard");
+
         return "dashboard";
     }
 
@@ -52,55 +53,69 @@ public class DashboardController {
     @GetMapping("/run-test")
     public String runTest(Model model) {
         model.addAttribute("pageTitle", "Run Gatling Test");
-        
+
+        // Get available JAR files from simulations directory
+        model.addAttribute("jarFiles", gatlingService.getAvailableJarFiles());
+
         // Get recent tests for the sidebar
         List<TestExecution> recentTests = gatlingService.getAllTestExecutions();
         model.addAttribute("recentTests", recentTests);
-        
+
         return "run-test";
     }
 
     /**
      * Handles the form submission for running a test.
      *
-     * @param testJar the JAR file to upload
-     * @param testClass the test class to run (optional)
-     * @param description the test description
-     * @param users the number of users
-     * @param rampUp the ramp-up period in seconds
-     * @param duration the test duration in seconds
+     * @param jarFile the selected JAR file name
+     * @param simulationClass the simulation class to run
+     * @param engineClass the engine class to use
+     * @param description the test description (optional)
+     * @param paramKeys array of parameter keys
+     * @param paramValues array of parameter values
      * @param redirectAttributes attributes for the redirect
      * @return a redirect to the results page
      */
     @PostMapping("/run-test")
     public String handleRunTest(
-            @RequestParam("testJar") MultipartFile testJar,
-            @RequestParam(value = "testClass", required = false) String testClass,
+            @RequestParam("jarFile") String jarFile,
+            @RequestParam("simulationClass") String simulationClass,
+            @RequestParam("engineClass") String engineClass,
             @RequestParam(value = "description", required = false) String description,
-            @RequestParam(value = "users", defaultValue = "10") int users,
-            @RequestParam(value = "rampUp", defaultValue = "30") int rampUp,
-            @RequestParam(value = "duration", defaultValue = "60") int duration,
+            @RequestParam(value = "paramKeys[]", required = false) String[] paramKeys,
+            @RequestParam(value = "paramValues[]", required = false) String[] paramValues,
             RedirectAttributes redirectAttributes) {
-        
+
         try {
-            // Upload the test JAR file
-            String testJarPath = gatlingService.uploadTestJar(testJar);
-            
-            // Create test parameters
-            TestParameters parameters = new TestParameters(users, rampUp, duration);
-            
-            // Run the test using the uploaded JAR filename (not full path)
-            TestExecution execution = gatlingService.runTest(testJar.getOriginalFilename(), testClass, description, parameters);
-            
-            redirectAttributes.addFlashAttribute("successMessage", "Test started successfully!");
-            return "redirect:/results";
-        } catch (IOException e) {
-            logger.error("Error running test", e);
-            redirectAttributes.addFlashAttribute("errorMessage", "Error running test: " + e.getMessage());
-            return "redirect:/run-test";
+            // Build parameters map
+            TestParameters parameters = new TestParameters();
+            if (paramKeys != null && paramValues != null && paramKeys.length == paramValues.length) {
+                for (int i = 0; i < paramKeys.length; i++) {
+                    if (paramKeys[i] != null && !paramKeys[i].trim().isEmpty()) {
+                        parameters.addParameter(paramKeys[i].trim(), paramValues[i]);
+                    }
+                }
+            }
+
+            // Run the test
+            TestExecution execution = gatlingService.runTest(
+                jarFile,
+                simulationClass,
+                engineClass,
+                description,
+                parameters
+            );
+
+            redirectAttributes.addFlashAttribute("successMessage",
+                "Test started successfully! Execution ID: " + execution.getId());
+            return "redirect:/results/" + execution.getId();
         } catch (IllegalArgumentException e) {
             logger.error("Error running test", e);
-            redirectAttributes.addFlashAttribute("errorMessage", "Error running test: " + e.getMessage());
+            redirectAttributes.addFlashAttribute("errorMessage", "Error: " + e.getMessage());
+            return "redirect:/run-test";
+        } catch (Exception e) {
+            logger.error("Unexpected error running test", e);
+            redirectAttributes.addFlashAttribute("errorMessage", "Unexpected error: " + e.getMessage());
             return "redirect:/run-test";
         }
     }

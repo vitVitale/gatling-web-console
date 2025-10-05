@@ -48,6 +48,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/**").authenticated()
             )
             .httpBasic(Customizer.withDefaults())
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(new org.springframework.security.web.authentication.HttpStatusEntryPoint(org.springframework.http.HttpStatus.UNAUTHORIZED))
+            )
             .sessionManagement(session -> session
                 .sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS)
             );
@@ -70,7 +73,7 @@ public class SecurityConfig {
             .securityMatcher("/**")
             .csrf(csrf -> csrf.disable()) // Disabled for simplicity, can be enabled if needed
             .authorizeHttpRequests(authorize -> authorize
-                .requestMatchers("/login", "/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
+                .requestMatchers("/login", "/css/**", "/js/**", "/images/**", "/webjars/**", "/actuator/health", "/error").permitAll()
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form

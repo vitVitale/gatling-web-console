@@ -26,57 +26,58 @@ public class TestController {
     @Autowired
     private GatlingService gatlingService;
     
-    /**
-     * Uploads a test JAR file and runs the test.
-     * 
-     * @param testJar the JAR file to upload
-     * @param testClass the test class to run (optional)
-     * @param description the test description
-     * @param users the number of users
-     * @param rampUp the ramp-up period in seconds
-     * @param duration the test duration in seconds
-     * @return the test execution
-     */
-    @PostMapping("/upload")
-    public ResponseEntity<TestExecution> uploadAndRunTest(
-            @RequestParam("testJar") MultipartFile testJar,
-            @RequestParam(value = "testClass", required = false) String testClass,
-            @RequestParam(value = "description", required = false) String description,
-            @RequestParam(value = "users", defaultValue = "10") int users,
-            @RequestParam(value = "rampUp", defaultValue = "30") int rampUp,
-            @RequestParam(value = "duration", defaultValue = "60") int duration) {
-        
-        try {
-            logger.info("Uploading test JAR: {}", testJar.getOriginalFilename());
-            String testJarPath = gatlingService.uploadTestJar(testJar);
-            
-            TestParameters parameters = new TestParameters(users, rampUp, duration);
-            
-            if (description == null || description.isEmpty()) {
-                description = "Test execution for " + testJar.getOriginalFilename();
-            }
-            
-            logger.info("Running test: {}, class: {}, parameters: {}", description, testClass, parameters.toGatlingArgs());
-            TestExecution execution = gatlingService.runTest(testJarPath, testClass, description, parameters);
-            
-            return ResponseEntity.ok(execution);
-        } catch (IOException e) {
-            logger.error("Error uploading test JAR", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    @GetMapping("/run")
-    public ResponseEntity<TestExecution> runTest() {
-
-        TestExecution execution = gatlingService.runTest(
-                "gatling_3.jar",
-//                "org.tests.computerdatabase.ComputerDatabaseSimulation",
-                "org.tests.demostoresimulation.DemostoreSimulation",
-                "description", new TestParameters());
-        return ResponseEntity.ok(execution);
-
-    }
+//    /**
+//     * Uploads a test JAR file and runs the test.
+//     *
+//     * @param testJar the JAR file to upload
+//     * @param testClass the test class to run (optional)
+//     * @param description the test description
+//     * @param users the number of users
+//     * @param rampUp the ramp-up period in seconds
+//     * @param duration the test duration in seconds
+//     * @return the test execution
+//     */
+//    @PostMapping("/upload")
+//    public ResponseEntity<TestExecution> uploadAndRunTest(
+//            @RequestParam("testJar") MultipartFile testJar,
+//            @RequestParam(value = "testClass", required = false) String testClass,
+//            @RequestParam(value = "description", required = false) String description,
+//            @RequestParam(value = "users", defaultValue = "10") int users,
+//            @RequestParam(value = "rampUp", defaultValue = "30") int rampUp,
+//            @RequestParam(value = "duration", defaultValue = "60") int duration) {
+//
+//        try {
+//            logger.info("Uploading test JAR: {}", testJar.getOriginalFilename());
+//            String testJarPath = gatlingService.uploadTestJar(testJar);
+//
+//            TestParameters parameters = new TestParameters(users, rampUp, duration);
+//
+//            if (description == null || description.isEmpty()) {
+//                description = "Test execution for " + testJar.getOriginalFilename();
+//            }
+//
+//            logger.info("Running test: {}, class: {}, parameters: {}", description, testClass, parameters.toGatlingArgs());
+//            TestExecution execution = gatlingService.runTest(testJarPath, testClass, description, parameters);
+//
+//            return ResponseEntity.ok(execution);
+//        } catch (IOException e) {
+//            logger.error("Error uploading test JAR", e);
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+//        }
+//    }
+//
+//    @GetMapping("/run")
+//    public ResponseEntity<TestExecution> runTest() {
+//
+//        TestExecution execution = gatlingService.runTest(
+//                "gatling_3.jar",
+////                "org.tests.computerdatabase.ComputerDatabaseSimulation",
+//                "org.tests.demostoresimulation.DemostoreSimulation",
+//                "Engine",
+//                "description", new TestParameters());
+//        return ResponseEntity.ok(execution);
+//
+//    }
     
     /**
      * Runs a test with the provided parameters.
@@ -90,7 +91,8 @@ public class TestController {
             // Use a default test file for API testing
             TestExecution execution = gatlingService.runTest(
                     "default-test.jar",
-                    null,
+                    "",
+                    "Engine",
                     "API test execution",
                     parameters);
             return ResponseEntity.ok(execution);
