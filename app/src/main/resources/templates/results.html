@@ -52,17 +52,6 @@
                             <tr th:if="${tests == null or #lists.isEmpty(tests)}">
                                 <td colspan="6" class="text-center">No test results available</td>
                             </tr>
-                            <!-- Sample data for display purposes -->
-                            <tr>
-                                <td>1</td>
-                                <td>Sample Load Test</td>
-                                <td>2025-07-26 19:00:00</td>
-                                <td>60s</td>
-                                <td><span class="badge bg-success">Completed</span></td>
-                                <td>
-                                    <a href="#" class="btn btn-sm btn-outline-primary">View</a>
-                                </td>
-                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -81,23 +70,19 @@
                                 <tbody>
                                     <tr>
                                         <th>Total Tests</th>
-                                        <td>1</td>
+                                        <td th:text="${totalTests ?: 0}">0</td>
                                     </tr>
                                     <tr>
                                         <th>Successful</th>
-                                        <td>1</td>
+                                        <td th:text="${successfulTests ?: 0}">0</td>
                                     </tr>
                                     <tr>
                                         <th>Failed</th>
-                                        <td>0</td>
+                                        <td th:text="${failedTests ?: 0}">0</td>
                                     </tr>
                                     <tr>
                                         <th>Stopped</th>
                                         <td th:text="${stoppedTests ?: 0}">0</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Average Duration</th>
-                                        <td>60s</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -114,8 +99,11 @@
                     <div class="card-body">
                         <div class="d-grid gap-2">
                             <a href="/run-test" class="btn btn-primary">Run New Test</a>
-                            <button class="btn btn-outline-secondary" disabled>Export Results</button>
-                            <button class="btn btn-outline-danger" disabled>Clear History</button>
+                            <a href="/results/export" class="btn btn-outline-secondary">Export Results</a>
+                            <form th:action="@{/results/clear-history}" method="post" onsubmit="return confirm('Are you sure you want to clear old test history? This cannot be undone.');">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button type="submit" class="btn btn-outline-danger w-100">Clear History</button>
+                            </form>
                         </div>
                     </div>
                 </div>

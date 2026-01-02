@@ -45,9 +45,9 @@ public class FileScanner {
     }
     
     /**
-     * Scans the simulations folder every 5 seconds.
+     * Scans the simulations folder at a configurable interval.
      */
-    @Scheduled(fixedRate = 5000)
+    @Scheduled(fixedRateString = "${app.file-scanner.interval:5000}")
     public void scanFolder() {
         Path folder = Paths.get(simulationsFolder);
         

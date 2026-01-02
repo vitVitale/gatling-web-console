@@ -71,7 +71,9 @@ public class SecurityConfig {
     public SecurityFilterChain webSecurityFilterChain(HttpSecurity http) throws Exception {
         http
             .securityMatcher("/**")
-            .csrf(csrf -> csrf.disable()) // Disabled for simplicity, can be enabled if needed
+            .csrf(csrf -> csrf
+                .ignoringRequestMatchers("/api/**") // Keep CSRF disabled for API endpoints
+            )
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers("/login", "/css/**", "/js/**", "/images/**", "/webjars/**", "/actuator/health", "/error").permitAll()
                 .anyRequest().authenticated()

@@ -29,6 +29,7 @@
                 </div>
                 <div class="card-body">
                     <form id="runTestForm" action="/run-test" method="post">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                         <!-- JAR File Selection -->
                         <div class="mb-3">
                             <label for="jarFile" class="form-label">JAR File <span class="text-danger">*</span></label>

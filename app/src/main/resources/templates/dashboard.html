@@ -9,6 +9,42 @@
             <h1 class="h2">Dashboard</h1>
         </div>
         
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card text-white bg-primary">
+                    <div class="card-body">
+                        <h6 class="card-title">Total Tests</h6>
+                        <h2 class="mb-0" th:text="${totalTests ?: 0}">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-success">
+                    <div class="card-body">
+                        <h6 class="card-title">Successful</h6>
+                        <h2 class="mb-0" th:text="${successfulTests ?: 0}">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-danger">
+                    <div class="card-body">
+                        <h6 class="card-title">Failed</h6>
+                        <h2 class="mb-0" th:text="${failedTests ?: 0}">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-info">
+                    <div class="card-body">
+                        <h6 class="card-title">Running</h6>
+                        <h2 class="mb-0" th:text="${runningTests ?: 0}">0</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <div class="row">
             <div class="col-md-4">
                 <div class="card mb-4">
